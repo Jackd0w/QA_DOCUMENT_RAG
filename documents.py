@@ -1,42 +1,32 @@
-from llama_index.core import VectorStoreIndex, Document, Settings, SimpleDirectoryReader 
-from llama_index.core.extractors import (
-    TitleExtractor,
-    QuestionsAnsweredExtractor,
-)
-from llama_index import SemanticSplitterNodeParser
-from llama_index.core.node_parser import TokenTextSplitter
-from sentence_transformers import SentenceTransformer
+import pymongo
+from llama_index.core import SimpleDirectoryReader, Settings, VectorStoreIndex, ServiceContext, StorageContext
 from llama_index.llms.ollama import Ollama
-import faiss
-from llama_index.vector_stores.faiss import FaissVectorStore
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 import numpy as np
-import httpx
-from sentence_transformers import SentenceTransformer
+from llama_index.embeddings.ollama import OllamaEmbedding
+from llama_index.vector_stores.mongodb import MongoDBAtlasVectorSearch
+from llama_index.core.retrievers import VectorIndexRetriever
+from llama_index.retrievers.bm25 import BM25Retriever
 
-model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
-semantic_parser = SemanticSplitterNodeParser(buffer_size=5, embed_model='paraphrase-MiniLM-L6-v2')
+mongo_uri = "mongodb://localhost:27017"
 
 
+mongodb_client = pymongo.MongoClient(mongo_uri)
+store = MongoDBAtlasVectorSearch(mongodb_client)
+storage_context = StorageContext.from_defaults(vector_store=store)
+
+
+embed_model = HuggingFaceEmbedding(
+    model_name="cointegrated/rubert-tiny"
+)
 
 
 documents = SimpleDirectoryReader("Simple_QA_Rag/data").load_data()
-print(f'Loaded {len(documents)} docs')
-nodes = semantic_parser.from_documents(documents)
+vector_index = VectorStoreIndex.from_documents(documents, show_progress=True, embed_model = embed_model, storage_context=storage_context)
 
-embeddings = model.encode(nodes)
-d = embeddings.shape[1]  # Размерность эмбеддингов
-index = faiss.IndexFlatL2(d)
-print("Database created.")
-index.add(embeddings)
+retriever = BM25Retriever.from_defaults(nodes=documents, similarity_top_k=2)
 
-index.storage_context.persist(persist_dir="Simple_QA_Rag/vec_data")
-
-
-"""
-vector_store = FaissVectorStore(len(nodes))
-
+#vector_index.as_query_engine(embed_model)
+nodes = retriever.retrieve("Какие предметы упоминаются в документе?")
 for node in nodes:
-    vector_store.add_node(node)
-    
-print("Данные успешно загружены и индексированы в Vespa.")
-"""
+    print(node)
