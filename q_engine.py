@@ -1,15 +1,34 @@
-from llama_index.core import load_index_from_storage, StorageContext
-from llama_index.vector_stores.faiss import FaissVectorStore
+from llama_index.core import load_index_from_storage, StorageContext, SummaryIndex
+from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.vector_stores.mongodb import MongoDBAtlasVectorSearch
+from llama_index.readers.mongodb import SimpleMongoReader
+from llama_index.llms.ollama import Ollama
+from llama_index.retrievers.bm25 import BM25Retriever
+import pymongo
+from tqdm import tqdm
 
 
+host = "localhost"
+port = 27017
+db_name = "default_db"
+collection_name = "default_collection"
+field_names = ["text"]
+query_dict = {}
 
-vector_store = FaissVectorStore.from_persist_dir("Simple_QA_Rag/vec_data")
-storage_context = StorageContext.from_defaults(
-    vector_store=vector_store, persist_dir="Simple_QA_Rag/vec_data"
+
+llm = Ollama(model = "llama3", request_timeout=180)
+
+mongo_uri = "mongodb://localhost:27017"
+
+mongodb_client = pymongo.MongoClient(mongo_uri)
+
+reader = SimpleMongoReader(host, port)
+
+nodes = reader.load_data(
+    db_name, collection_name, field_names, query_dict=query_dict
 )
 
-index = load_index_from_storage(storage_context=storage_context)
-query_engine = index.as_query_engine(streaming=True)
-streaming_response = query_engine.query("Who is the main character?")
-streaming_response.print_response_stream()
+retriever = BM25Retriever.from_defaults(nodes=nodes, similarity_top_k=2)
+nodes = retriever.retrieve("Что такое uml?")
+for node in tqdm(nodes):
+    print(node)
