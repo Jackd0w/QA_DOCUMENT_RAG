@@ -1,33 +1,39 @@
-import pymongo
 from llama_index.core import SimpleDirectoryReader, Settings, VectorStoreIndex, ServiceContext, StorageContext
 from llama_index.llms.ollama import Ollama
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from langchain_community.embeddings import HuggingFaceEmbeddings
 import numpy as np
-from llama_index.vector_stores.mongodb import MongoDBAtlasVectorSearch
-from llama_index.core.node_parser import TokenTextSplitter, SentenceSplitter
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from llama_index.core.schema import MetadataMode
 from tqdm import tqdm
+from dotenv import load_dotenv
+from langchain.chains import RetrievalQA
+import os
+import PyPDF2
+import string
 
-mongo_uri = "mongodb://localhost:27017"
+CONNECTION_STRING = "postgresql+psycopg2://postgres:test@localhost:5432/Document_RAG"
+COLLECTION_NAME = "state"
+DB_FAISS_PATH = 'vectorstore/db_faiss'
+embedding=HuggingFaceEmbeddings(model_name="cointegrated/rubert-tiny")
 
+def create_retriever(db_path, embedding):
+        loader=PyPDFLoader("data/bellstoll.pdf")
+        docs=loader.load()
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        splits = text_splitter.split_documents(docs)
+        vectorstore = FAISS.from_documents(documents=splits, embedding=embedding)
+        vectorstore.save_local(db_path)
+    
+    
+def similarity_search(user_query, db):
+        return db.similarity_search(user_query)
+    
+    
+    
+if __name__ == "__main__":
+        #create_retriever(DB_FAISS_PATH, embedding)
+        db = FAISS.load_local("vectorstore/db_faiss/", embedding, allow_dangerous_deserialization=True)
 
-mongodb_client = pymongo.MongoClient(mongo_uri)
-store = MongoDBAtlasVectorSearch(mongodb_client)
-storage_context = StorageContext.from_defaults(vector_store=store)
-
-
-Settings.llm = Ollama(model="llama2", request_timeout=60)
-Settings.embed_model = HuggingFaceEmbedding(
-        model_name="cointegrated/rubert-tiny")
-
-
-documents = SimpleDirectoryReader("Simple_QA_Rag/data").load_data()
-
-splitter = SentenceSplitter(chunk_size=1024)
-nodes = splitter.get_nodes_from_documents(documents)
-
-vector_index = VectorStoreIndex(nodes=nodes, storage_context=storage_context, transformations = [
-        TokenTextSplitter(chunk_size=128, chunk_overlap=32),
-        HuggingFaceEmbedding(
-        model_name="cointegrated/rubert-tiny")
-    ], show_progress=True)
+        print(similarity_search("Who was the leader of Spanish nationalits", db)[0])

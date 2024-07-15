@@ -1,13 +1,18 @@
-from llama_index.core.tools import FunctionTool
-from llama_index.llms.ollama import Ollama
-from llama_index.core.agent import ReActAgent
+import os
+import psycopg2
 
 
-def multiply(a: int, b: int) -> int:
-    return a * b
+def get_connection():
+    try:
+        conn = psycopg2.connect(
+            dbname=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            host=os.getenv("DB_HOST"),
+            port=os.getenv("DB_PORT"),
+        )
+        return conn
+    except:
+        print("I am unable to connect to the database")
 
-multiply_tool = FunctionTool.from_defaults(fn=multiply)
-
-llm = Ollama(model="Llama3")
-
-agent = ReActAgent.from_tools([multiply_tool], llm=llm, verbose=True)
+get_connection()
