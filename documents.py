@@ -26,6 +26,12 @@ def create_retriever(db_path, embedding):
         vectorstore = FAISS.from_documents(documents=splits, embedding=embedding)
         vectorstore.save_local(db_path)
     
+def vectorise(file_name, db):
+        loader=PyPDFLoader("data/bellstoll.pdf")
+        docs=loader.load()
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        splits = text_splitter.split_documents(docs)
+        
     
 def similarity_search(user_query, db):
         return db.similarity_search(user_query)
