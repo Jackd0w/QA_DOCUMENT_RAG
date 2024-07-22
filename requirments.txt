@@ -1,0 +1,7 @@
+langchain
+faiss
+pickle
+requests
+bs4
+streamlit
+langchain_community.embeddings 
