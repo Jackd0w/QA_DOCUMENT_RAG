@@ -19,7 +19,7 @@
 
 ### Run Your Query In Shell
 ```bash
-python -m app.app
+streamlit run chat.py
 ```
 Then enter your query.
 
